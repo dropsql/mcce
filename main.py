@@ -19,7 +19,6 @@ from rich.console import Console
 console = Console(log_time_format='`%X`')
 
 def make_payload(code: str, favicon: bytes) -> dict:
-
     favicon += b'[<code_start>]%s[<code_end>]' % code.encode()
 
     payload = json.dumps({
@@ -80,8 +79,17 @@ parser.add_argument('--favicon', required=True, metavar='', help='favicon to emb
 
 args = parser.parse_args()
 
-code = '\n'.join([x.strip() for x in open(args.payload).readlines()])
-fav = open(args.favicon, 'rb').read()
+try:
+    code = '\n'.join([x.strip() for x in open(args.payload).readlines()])
+except:
+    console.log('failed to load payload code.')
+    sys.exit()
+
+try:
+    fav = open(args.favicon, 'rb').read()
+except:
+    console.log('failed to load favicon.')
+    sys.exit()
 
 payload = make_payload(code, fav)
 
