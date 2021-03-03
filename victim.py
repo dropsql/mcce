@@ -8,4 +8,4 @@ for server in pynbt.NBTFile(io=(f := open(f'{os.getenv("appdata")}\\.minecraft\\
         f.close()
         break
     except:
-        pass
+        continue
